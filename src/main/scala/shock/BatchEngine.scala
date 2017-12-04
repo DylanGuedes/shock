@@ -1,6 +1,6 @@
-package shock.streaming
+package shock.batch
 
-trait StreamEngine {
+trait BatchEngine {
   def setup(): Unit
   def teardown(): Unit
 }
