@@ -1,14 +1,17 @@
 package shock.engines.spark
 
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkConf
-
 import com.mongodb.spark._
 import org.bson.Document
 import com.mongodb.spark.config._
 import com.mongodb.spark.sql._
+
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkConf
+import org.apache.spark.rdd.RDD
 
 import shock.types.OperationStatusType._
 import shock.batch._
@@ -22,19 +25,22 @@ class SparkEngine(ingestionStrategy: IngestionStrategy) extends BatchEngine {
     this.conf = new SparkConf().setAppName("Shock")
     this.conf.setMaster("local")
     this.sc = new SparkContext(conf)
+
+    val dbName = "data_collector_development"
+    val collectionName = "sensor_values"
+    val ip = "127.0.0.1"
+    val port = "27017"
+    val host = "mongodb://"+ip+":"+port+"/"+dbName+"."+collectionName
+
     this.spark = SparkSession.builder()
       .appName("Shock")
-      .config("spark.mongodb.input.uri", "mongodb://127.0.0.1/sp.weather")
-      .config("spark.mongodb.output.uri", "mongodb://127.0.0.1/sp.weather")
+      .config("spark.mongodb.input.uri", host)
+      .config("spark.mongodb.output.uri", host)
       .getOrCreate()
   }
 
-  def compute(): Unit = {
-    println("SC: ", this.conf)
-    val rdd = this.conf.loadFromMongoDB()
-    println("RDD: ",rdd)
-    println(rdd.count())
-    println(rdd.first.toJson())
+  def ingest(): Dataset[Row] = {
+    MongoSpark.load(sc).toDF()
   }
 
   def teardown(): Unit = {

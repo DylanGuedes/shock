@@ -57,6 +57,15 @@ services:
       - ./conf/worker:/conf
       - ./data:/tmp/data
 
+  kafka:
+    container_name: kafka
+    image: 'spotify/kafka'
+    ports:
+      - 9092:9092
+      - 2181:2181
+    environment:
+      ADVERTISED_HOST: 172.17.0.1
+
 networks:
   default:
     external:
