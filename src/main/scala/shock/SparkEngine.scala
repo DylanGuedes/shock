@@ -28,7 +28,7 @@ class SparkEngine(ingestionStrategy: IngestionStrategy) extends BatchEngine {
 
     val dbName = "data_collector_development"
     val collectionName = "sensor_values"
-    val ip = "127.0.0.1"
+    val ip = "data-collector-mongo"
     val port = "27017"
     val host = "mongodb://"+ip+":"+port+"/"+dbName+"."+collectionName
 

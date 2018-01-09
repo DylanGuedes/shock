@@ -32,3 +32,6 @@ lazy val root = (project in file(".")).
         Some("releases"  at nexus + "service/local/staging/deploy/maven2")
     }
   )
+
+libraryDependencies += "org.jfarcand" % "wcs" % "1.5"
+libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.8"

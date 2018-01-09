@@ -7,6 +7,10 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.Dataset
 
+import play.api.libs.json.Json
+
+import org.jfarcand.wcs.{WebSocket, TextListener}
+
 object Shock {
   def main(args: Array[String]) {
     val engine = new SparkEngine(new MongoIngestionStrategy)
@@ -25,35 +29,12 @@ object Shock {
     println(df3.show())
     val statistics = df3.describe().selectExpr("summary as key", "bike_slots as value")
     statistics.show()
-    statistics.write.format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:9092")
-      .option("topic", "interscity")
-      .save()
-    // println(statistics.toJSON())
 
-    // printSchema()
-    // describe().show()
-    // df.groupBy("capability").count().show()
-    // df.where($"capability" == 
-
-  //   println("LINES:")
-  //   val lines = engine.spark.readStream.format("socket").option("host", "localhost").option("port", 9999).load()
-  //
-  // // Generate running word count
-  // // val wordCounts = words.groupBy("value").count()
-  //   println("AFTERLINES: ", lines)
-  //
-  //   val query = lines.writeStream.format("console").start()
-  //
-  //   query.awaitTermination()
-
-    // val words = lines.as[String].flatMap(_.split(" "))
-    //
-    // val wordCounts = words.groupBy("value").count()
-
-    // val rdd = sc.parallelize(Seq(1,2,3,4))
-    // val rdd2 = rdd.map(_*2)
-    // rdd2.collect.foreach(println)
-    // println("count: ", rdd2.count)
+    WebSocket().open("ws://172.17.0.1:41234/socket/websocket").listener(
+      new TextListener {
+        override def onMessage(message: String) {
+          println(message)
+        }
+      }).send(Json.stringify(Json.obj("name" -> "hi")))
   }
 }
