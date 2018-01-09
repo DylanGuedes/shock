@@ -23,6 +23,3 @@ class SparkStreamEngine(ingestionStrategy: IngestionStrategy) extends StreamEngi
   def teardown(): Unit = {
   }
 }
-
-class KafkaStructuredStreaming() extends IngestionStrategy {
-}

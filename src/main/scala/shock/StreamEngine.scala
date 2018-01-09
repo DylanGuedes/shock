@@ -6,4 +6,5 @@ trait StreamEngine {
 }
 
 trait IngestionStrategy {
+  def setup(): Unit
 }

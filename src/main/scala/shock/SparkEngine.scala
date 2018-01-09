@@ -9,6 +9,7 @@ import org.apache.spark.sql.Row
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.SparkSession.Builder
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
@@ -22,6 +23,8 @@ class SparkEngine(ingestionStrategy: IngestionStrategy) extends BatchEngine {
   var spark: SparkSession = null
 
   def setup(): Unit = {
+    ingestionStrategy.setup()
+
     this.conf = new SparkConf().setAppName("Shock")
     this.conf.setMaster("local")
     this.sc = new SparkContext(conf)
@@ -32,10 +35,8 @@ class SparkEngine(ingestionStrategy: IngestionStrategy) extends BatchEngine {
     val port = "27017"
     val host = "mongodb://"+ip+":"+port+"/"+dbName+"."+collectionName
 
-    this.spark = SparkSession.builder()
+    this.spark = ingestionStrategy.configSession(SparkSession.builder())
       .appName("Shock")
-      .config("spark.mongodb.input.uri", host)
-      .config("spark.mongodb.output.uri", host)
       .getOrCreate()
   }
 
@@ -47,5 +48,39 @@ class SparkEngine(ingestionStrategy: IngestionStrategy) extends BatchEngine {
   }
 }
 
-class MongoIngestionStrategy() extends IngestionStrategy {
+class MongoIngestionStrategy(options: Map[String, String]) extends IngestionStrategy {
+  var dbName: String = "data_collector_development"
+  var collectionName: String = "sensor_values"
+  var ip: String = "data-collector-mongo"
+  var port: String = "27017"
+
+  def configSession(spark: Builder): Builder = {
+    var host: String = buildHost()
+
+    spark
+      .config("spark.mongodb.input.uri", host)
+      .config("spark.mongodb.output.uri", host)
+  }
+
+  def setup(): Unit = {
+    if (options.contains("--mongo-db")) {
+      this.dbName = options("--mongo-db")
+    }
+
+    if (options.contains("--mongo-collection")) {
+      this.collectionName = options("--mongo-collection")
+    }
+
+    if (options.contains("--mongo-ip")) {
+      this.ip = options("--mongo-ip")
+    }
+
+    if (options.contains("--mongo-port")) {
+      this.ip = options("--mongo-port")
+    }
+  }
+
+  def buildHost(): String = {
+    "mongodb://"+this.ip+":"+this.port+"/"+this.dbName+"."+this.collectionName
+  }
 }
