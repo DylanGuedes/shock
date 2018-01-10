@@ -1,16 +1,17 @@
 package shock.main
 import org.apache.spark.sql.types._
 
+import shock.websocket.WS
+
 import org.bson.Document
 import shock.engines.spark._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.Dataset
 
-import play.api.libs.json.Json
-import play.api.libs.json.JsValue
+import org.apache.spark.sql.functions.{col}
 
-import org.jfarcand.wcs.{WebSocket, TextListener}
+import play.api.libs.json.{JsString, Json}
 
 object Shock {
   def main(args: Array[String]) {
@@ -21,14 +22,27 @@ object Shock {
     engine.setup()
 
     val df: Dataset[Row] = engine.ingest()
+    val analytics = df.describe()
+    analytics.show()
+    // analytics.printSchema()
+    // analytics.toJSON
+    // println("analytics => ", analytics)
 
-    val conn: WebSocket = openWebSocket(options)
+    val conn: WS = new WS().open("ws://"+options("--ws-server")+"/socket/websocket")
 
-    joinTopic(conn, "awesome")
-  }
+    conn.subscribe("analytics")
+    analytics.columns.map({c =>
+      val values: List[Any] = analytics.select(col(c)).collect().map(r => r(0)).toList
+      val payload = Json.obj(
+        "count" -> JsString(values(0).asInstanceOf[String]),
+        "mean" -> JsString(values(1).asInstanceOf[String]),
+        "stddev" -> JsString(values(2).asInstanceOf[String]),
+        "min" -> JsString(values(3).asInstanceOf[String]),
+        "max" -> JsString(values(4).asInstanceOf[String])
+      )
 
-  def openWebSocket(options: Map[String, String]): WebSocket = {
-    WebSocket().open("ws://"+options("--ws-server")+"/socket/websocket")
+      conn.sendMsg("analytics:summary:"+c, payload)
+    })
   }
 
   def parseOptions(args: Array[String]): Map[String, String] = {
@@ -43,20 +57,5 @@ object Shock {
       // websocket server used to build the pipeline
       throw new RuntimeException("Missing required param: ws-server")
     }
-  }
-
-  def joinTopic(conn: WebSocket, topic: String): WebSocket = {
-    sendMsg(conn, topic, Json.obj(), "phx_join")
-  }
-
-  def sendMsg(conn: WebSocket, topic: String, payload: JsValue, event: String = "payload"): WebSocket = {
-    var msg: JsValue = Json.obj(
-      "topic" -> topic,
-      "event" -> event,
-      "payload" -> Json.stringify(payload),
-      "ref" -> ""
-    )
-
-    conn.send(Json.stringify(msg))
   }
 }
