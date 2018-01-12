@@ -11,7 +11,7 @@ import org.apache.spark.sql.Dataset
 
 import org.apache.spark.sql.functions.{col}
 
-import play.api.libs.json.{JsString, Json}
+import play.api.libs.json.{JsString, Json, JsArray, JsNumber, JsObject}
 
 object Shock {
   def main(args: Array[String]) {
@@ -22,27 +22,32 @@ object Shock {
     engine.setup()
 
     val df: Dataset[Row] = engine.ingest()
-    val analytics = df.describe()
+    // val analytics = df.describe()
+    val analytics = df
     analytics.show()
-    // analytics.printSchema()
+    analytics.printSchema()
     // analytics.toJSON
     // println("analytics => ", analytics)
 
-    val conn: WS = new WS().open("ws://"+options("--ws-server")+"/socket/websocket")
+    var conn: WS = new WS().open("ws://"+options("--ws-server")+"/socket/websocket")
+    conn = conn.subscribe("analytics")
 
-    conn.subscribe("analytics")
-    analytics.columns.map({c =>
-      val values: List[Any] = analytics.select(col(c)).collect().map(r => r(0)).toList
-      val payload = Json.obj(
-        "count" -> JsString(values(0).asInstanceOf[String]),
-        "mean" -> JsString(values(1).asInstanceOf[String]),
-        "stddev" -> JsString(values(2).asInstanceOf[String]),
-        "min" -> JsString(values(3).asInstanceOf[String]),
-        "max" -> JsString(values(4).asInstanceOf[String])
-      )
-
-      conn.sendMsg("analytics:summary:"+c, payload)
+    var c: String = "temperature"
+    var values: Array[Any] = analytics.select("temperature", "created_at", "humidity").na.drop().collect().map(r => {
+      Map("temperature" -> r(0), "created_at" -> r(1), "humidity" -> r(2))
     })
+
+    var values2: Array[JsObject] = values.map((item) => {
+      val myhash: Map[String, Any] = item.asInstanceOf[Map[String, Any]]
+      Json.obj(
+        "temperature" -> JsNumber(myhash("temperature").asInstanceOf[Double]),
+        "created_at" -> JsString(myhash("created_at").toString),
+        "humidity" -> JsNumber(myhash("humidity").asInstanceOf[Double])
+      )
+    })
+    var payload = Json.obj(c -> JsArray(values2))
+    conn = conn.sendMsg("analytics", payload, "summary:"+c)
+
   }
 
   def parseOptions(args: Array[String]): Map[String, String] = {
