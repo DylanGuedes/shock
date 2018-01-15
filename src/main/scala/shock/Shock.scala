@@ -1,53 +1,20 @@
 package shock.main
-import org.apache.spark.sql.types._
 
-import shock.websocket.WS
+import shock.kafka.KC
 
-import org.bson.Document
-import shock.engines.spark._
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.Dataset
+import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 
-import org.apache.spark.sql.functions.{col}
-
-import play.api.libs.json.{JsString, Json, JsArray, JsNumber, JsObject}
+import java.util.{Collections, Properties}
 
 object Shock {
+  var options: Map[String, String] = Map[String, String]()
+
   def main(args: Array[String]) {
-    val options: Map[String, String] = parseOptions(args)
+    this.options = parseOptions(args)
     checkRequiredOptions(options)
 
-    val engine = new SparkEngine(new MongoIngestionStrategy(options))
-    engine.setup()
-
-    val df: Dataset[Row] = engine.ingest()
-    // val analytics = df.describe()
-    val analytics = df
-    analytics.show()
-    analytics.printSchema()
-    // analytics.toJSON
-    // println("analytics => ", analytics)
-
-    var conn: WS = new WS().open("ws://"+options("--ws-server")+"/socket/websocket")
-    conn = conn.subscribe("analytics")
-
-    var c: String = "temperature"
-    var values: Array[Any] = analytics.select("temperature", "created_at", "humidity").na.drop().collect().map(r => {
-      Map("temperature" -> r(0), "created_at" -> r(1), "humidity" -> r(2))
-    })
-
-    var values2: Array[JsObject] = values.map((item) => {
-      val myhash: Map[String, Any] = item.asInstanceOf[Map[String, Any]]
-      Json.obj(
-        "temperature" -> JsNumber(myhash("temperature").asInstanceOf[Double]),
-        "created_at" -> JsString(myhash("created_at").toString),
-        "humidity" -> JsNumber(myhash("humidity").asInstanceOf[Double])
-      )
-    })
-    var payload = Json.obj(c -> JsArray(values2))
-    conn = conn.sendMsg("analytics", payload, "summary:"+c)
-
+    val consumer: KC = new KC(options)
+    consumer.consume()
   }
 
   def parseOptions(args: Array[String]): Map[String, String] = {

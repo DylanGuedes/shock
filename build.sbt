@@ -36,3 +36,5 @@ lazy val root = (project in file(".")).
 libraryDependencies += "org.jfarcand" % "wcs" % "1.5"
 libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.8"
 libraryDependencies += "com.github.scopt" %% "scopt" % "3.7.0"
+libraryDependencies += "org.apache.kafka" %% "kafka" % "0.10.2.1"
+libraryDependencies += "org.apache.kafka" % "kafka-clients" % "0.10.2.1"
