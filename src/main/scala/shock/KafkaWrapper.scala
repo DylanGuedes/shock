@@ -40,13 +40,17 @@ class KC(options: Map[String, String]) {
 
   def consume(pollRate: Long = 1000): Unit = {
     this.handler.loadResolvers()
+    println("Loading resolvers...")
     _kafkaConsumer.subscribe(Collections.singletonList(this.topic))
+    println("Subscribing to topics...")
 
+    println("Preparing to start fetching...")
     while (true) {
       val records: ConsumerRecords[String, String] = _kafkaConsumer.poll(pollRate)
 
       for (record: ConsumerRecord[String, String] <- records) {
         val msg: String = record.value
+        println("Msg => ", msg)
         this.handler.handle(msg)
       }
     }

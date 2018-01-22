@@ -22,6 +22,7 @@ class SparkEngine() {
   val spark: SparkSession = SparkSession.builder()
     .config("spark.mongodb.input.uri", mongoHost)
     .config("spark.mongodb.output.uri", mongoHost)
+    .config("spark.cleaner.referenceTracking.cleanCheckpoints", "true")
     .getOrCreate()
 }
 

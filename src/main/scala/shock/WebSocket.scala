@@ -1,8 +1,7 @@
 package shock.websocket
 
 import org.jfarcand.wcs.{WebSocket, TextListener}
-import play.api.libs.json.Json
-import play.api.libs.json.JsValue
+import play.api.libs.json.{Json, JsValue}
 
 class WS() {
   var _webSocket: WebSocket = WebSocket()

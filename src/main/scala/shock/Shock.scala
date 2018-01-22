@@ -14,6 +14,7 @@ object Shock {
     checkRequiredOptions(options)
 
     val consumer: KC = new KC(options)
+    println("Start consuming...")
     consumer.consume()
   }
 
