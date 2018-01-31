@@ -9,32 +9,38 @@ import play.api.libs.json.{Json, JsValue, JsArray, JsNumber, JsObject}
 
 import shock.websocket.WS
 
+import play.api.libs.json.{JsValue, JsObject}
+
 object PublishingStrategies {
-  def websocketPublishing(engine: SparkEngine, pipeline: Pipeline, opts: Map[String, String]): Pipeline = {
+  def websocketPublishing(engine: SparkEngine, pipeline: Pipeline, opts: JsValue): Pipeline = {
     if (!pipeline.state.head(1).isEmpty) {
       val df: Dataset[Row] = pipeline.state
 
       var ws_server = "ws://172.17.0.1:41234/socket/websocket"
-      if (opts.keySet.exists(_ == "ws_server")) {
-        ws_server = opts("ws_server")
+
+      val opts2: scala.collection.Map[String, JsValue]= opts.as[JsObject].value
+
+      if (opts2.keySet.exists(_ == "ws_server")) {
+        ws_server = opts2("ws_server").as[String]
       }
+
       var conn: WS = new WS().open(ws_server).subscribe("analytics")
 
       var ws_topic = "analytics"
-      if (opts.keySet.exists(_ == "ws_topic")) {
-        ws_topic = opts("ws_topic")
+      if (opts2.keySet.exists(_ == "ws_topic")) {
+        ws_topic = opts2("ws_topic").as[String]
       }
       conn = conn.subscribe(ws_topic)
 
       df.printSchema()
 
-      val features: Seq[String] = opts("features").split(" . ")
+      val features: Seq[String] = opts2("features").as[Seq[String]]
       // var values: Dataset[Row] = df.select(features.map(c => col(c)): _*)
       var values: Dataset[Row] = df.select("temperature", "created_at", "humidity")
 
       var dropNil: Boolean = true
-      if (opts.keySet.exists(_ == "drop_nil")) {
-        dropNil = opts("drop_nil").toBoolean
+      if (opts2.keySet.exists(_ == "drop_nil")) {
+        dropNil = opts("drop_nil").as[String].toBoolean
       }
 
       if (dropNil) {
@@ -53,11 +59,11 @@ object PublishingStrategies {
       })
 
       var ws_event = "update"
-      if (opts.keySet.exists(_ == "update")) {
-        ws_event = opts("update")
+      if (opts2.keySet.exists(_ == "update")) {
+        ws_event = opts("update").as[String]
       }
 
-      var payload = Json.obj(opts("result_feature") -> JsArray(values2))
+      var payload = Json.obj(opts("result_feature").as[String] -> JsArray(values2))
       conn = conn.sendMsg(ws_topic, payload, ws_event)
     }
     pipeline

@@ -2,8 +2,10 @@ package shock.handlers
 
 import shock.pipeline.Pipeline
 import shock.engines.spark.{SparkEngine}
-import shock.tasks.{IngestionStrategies, PublishingStrategies}
+import shock.tasks.{IngestionStrategies, PublishingStrategies, ProcessingStrategies}
 import shock.aliases.{TaskSignature, StringHash}
+
+import play.api.libs.json.{Json, JsValue}
 
 trait Handler {
   def handle(msg: String): Unit
@@ -18,33 +20,31 @@ class InterSCityHandler(options: StringHash) extends Handler {
   def loadResolvers(): Unit = {
     this.resolvers += ("mongo_ingestion" -> IngestionStrategies.mongoIngestion)
     this.resolvers += ("websocket_publish" -> PublishingStrategies.websocketPublishing)
+    this.resolvers += ("post_request_ingestion" -> IngestionStrategies.postRequestIngestion)
+    this.resolvers += ("anomaly_detection" -> IngestionStrategies.postRequestIngestion)
+    this.resolvers += ("post_publish" -> IngestionStrategies.postRequestIngestion)
+    this.resolvers += ("sci_populis_processing" -> ProcessingStrategies.sciPopulisProcessing)
   }
 
   def handle(msg: String) {
-    val tokens: Array[String] = msg.split(";")
+    val tokens: Array[String] = msg.split("#")
 
-    if (tokens.length == 3) {
-      val pipelineName: String = tokens(0)
-      val taskMethod: String = tokens(1)
-      val taskArgs: String = tokens(2)
+    val opts: JsValue = Json.parse(tokens(1))
+    val pipelineName: String = (opts \ "stream").as[String]
 
+    if (tokens(0) == "new_pipeline") {
       if (!pipelines.keySet.exists(_ == pipelineName))
         pipelines += (pipelineName -> new Pipeline())
+    } else if (tokens(0) == "update_pipeline") {
+      val taskMethod: String = (opts \ "shock_action").as[String]
 
-      // taskArgs format: opt1=val1,opt2=val2,opt3=val3,...
-      val opts: StringHash = taskArgs.split(",").foldLeft(Map[String, String]())((total: StringHash, item: String) => {
-        val splittedArg: Array[String] = item.split("=")
-        total + (splittedArg(0) -> splittedArg(1))
-      })
-      
       pipelines(pipelineName).addTask(this.resolvers(taskMethod), opts)
-    } else if (tokens.length == 2) {
-      val command: String = tokens(0)
-      val pipelineName: String = tokens(1)
-
+    } else if (tokens(0) == "start_pipeline") {
       if (pipelines.keySet.exists(_ == pipelineName)) {
         pipelines(pipelineName).start(engine)
       }
+    } else if (tokens(0) == "info") {
+      pipelines(pipelineName).tasksQueue.foreach((mtd) => { println(mtd) })
     }
   }
 }

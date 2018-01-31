@@ -6,7 +6,7 @@ import com.mongodb.spark.config._
 import com.mongodb.spark.sql._
 
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Row, SparkSession, Dataset}
+import org.apache.spark.sql.{SQLContext, Row, SparkSession, Dataset}
 import org.apache.spark.sql.SparkSession.Builder
 import org.apache.spark.{SparkContext, SparkConf}
 import org.apache.spark.rdd.RDD
@@ -22,7 +22,7 @@ class SparkEngine() {
   val spark: SparkSession = SparkSession.builder()
     .config("spark.mongodb.input.uri", mongoHost)
     .config("spark.mongodb.output.uri", mongoHost)
+    .config("spark.sql.warehouse.dir", "/data")
     .config("spark.cleaner.referenceTracking.cleanCheckpoints", "true")
     .getOrCreate()
 }
-

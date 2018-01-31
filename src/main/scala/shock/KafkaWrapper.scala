@@ -13,7 +13,7 @@ import shock.handlers._
 class KC(options: Map[String, String]) {
   val props = createConsumerConfig(options)
   val _kafkaConsumer: KafkaConsumer[String, String] = new KafkaConsumer[String, String](props)
-  val topic = "pipeline"
+  val topic = "new_pipeline_instruction"
   val handler: Handler = new InterSCityHandler(options)
 
   def createConsumerConfig(options: Map[String, String]): Properties = {
