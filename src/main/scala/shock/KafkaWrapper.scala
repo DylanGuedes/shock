@@ -1,4 +1,4 @@
-package shock.kafka
+package shock
 
 import org.apache.kafka.clients.consumer.{
   ConsumerConfig,

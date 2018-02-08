@@ -1,7 +1,7 @@
-package shock.pipeline
+package shock
 
 import shock.aliases.TaskSignature
-import shock.engines.spark.SparkEngine
+import shock.engines.SparkEngine
 
 import org.apache.spark.sql.DataFrame
 
@@ -23,7 +23,6 @@ class Pipeline() {
   def start(se: SparkEngine, pipeline: Pipeline): Pipeline = {
     tasksQueue.foldLeft(pipeline: Pipeline)((acc: Pipeline, pair: (TaskSignature, JsValue)) => {
       val (task: TaskSignature, args: JsValue) = pair
-      println("args => ")
       Json.prettyPrint(args)
       task(se, acc, args)
     })

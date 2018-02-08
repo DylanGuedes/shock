@@ -1,7 +1,7 @@
-package shock.tasks
+package shock.tasks.ingestion
 
-import shock.pipeline.Pipeline
-import shock.engines.spark._
+import shock.Pipeline
+import shock.engines._
 import scalaj.http.{HttpResponse, Http}
 
 import com.mongodb.spark.MongoSpark

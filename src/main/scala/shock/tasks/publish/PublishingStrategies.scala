@@ -1,7 +1,7 @@
-package shock.tasks
+package shock.tasks.publish
 
-import shock.pipeline.Pipeline
-import shock.engines.spark._
+import shock.Pipeline
+import shock.engines._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Row, SparkSession, Dataset}
 

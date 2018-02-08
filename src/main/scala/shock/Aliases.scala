@@ -1,5 +1,5 @@
-import shock.engines.spark.SparkEngine
-import shock.pipeline.Pipeline
+import shock.engines.SparkEngine
+import shock.Pipeline
 
 import play.api.libs.json.{JsValue}
 

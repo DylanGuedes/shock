@@ -1,8 +1,10 @@
 package shock.handlers
 
-import shock.pipeline.Pipeline
-import shock.engines.spark.{SparkEngine}
-import shock.tasks.{IngestionStrategies, PublishingStrategies, ProcessingStrategies}
+import shock.Pipeline
+import shock.engines.{SparkEngine}
+import shock.tasks.ingestion.{IngestionStrategies}
+import shock.tasks.publish.PublishingStrategies
+import shock.tasks.processing.ProcessingStrategies
 import shock.aliases.{TaskSignature, StringHash}
 
 import play.api.libs.json.{Json, JsValue}

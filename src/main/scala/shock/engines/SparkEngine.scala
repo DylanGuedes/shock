@@ -1,4 +1,4 @@
-package shock.engines.spark
+package shock.engines
 
 import com.mongodb.spark._
 import org.bson.Document
