@@ -1,19 +1,17 @@
 package shock.tasks.publish
 
-import shock.Pipeline
-import shock.engines._
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Row, SparkSession, Dataset}
-
-import play.api.libs.json.{Json, JsValue, JsArray, JsNumber, JsObject}
+import org.apache.spark.sql.{Dataset, Row}
 
 import shock.websocket.WS
+import shock.Pipeline
+import shock.engines.SparkEngine
+import play.api.libs.json.{JsValue, JsObject, Json, JsNumber, JsArray}
+import org.apache.spark.sql.functions.{col, explode, desc}
 
-import play.api.libs.json.{JsValue, JsObject}
-
-object PublishingStrategies {
-  def websocketPublishing(engine: SparkEngine, pipeline: Pipeline, opts: JsValue): Pipeline = {
-    if (!pipeline.state.head(1).isEmpty) {
+object WebsocketPublish extends PublishStrategy {
+  def publish(engine: SparkEngine, pipeline: Pipeline, opts: JsValue): Pipeline = {
+    // check if the state is empty
+    if (pipeline.state.count != 0) {
       val df: Dataset[Row] = pipeline.state
 
       var ws_server = "ws://172.17.0.1:41234/socket/websocket"

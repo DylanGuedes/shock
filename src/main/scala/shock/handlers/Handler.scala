@@ -3,7 +3,7 @@ package shock.handlers
 import shock.Pipeline
 import shock.engines.{SparkEngine}
 import shock.tasks.ingestion.{MongoIngestion, PostRequestIngestion}
-import shock.tasks.publish.PublishingStrategies
+import shock.tasks.publish.WebsocketPublish
 import shock.tasks.processing.WhereQuery
 import shock.aliases.{TaskSignature, StringHash}
 
@@ -21,7 +21,7 @@ class InterSCityHandler(options: StringHash) extends Handler {
 
   def loadResolvers(): Unit = {
     this.resolvers += ("mongo_ingestion" -> MongoIngestion.ingest)
-    this.resolvers += ("websocket_publish" -> PublishingStrategies.websocketPublishing)
+    this.resolvers += ("websocket_publish" -> WebsocketPublish.publish)
     this.resolvers += ("post_request_ingestion" -> PostRequestIngestion.ingest)
     this.resolvers += ("sci_populis_processing" -> WhereQuery.process)
   }
