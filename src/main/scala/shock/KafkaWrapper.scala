@@ -1,3 +1,20 @@
+// Copyright (C) 2018 Dylan Guedes
+//
+// This file is part of Shock.
+//
+// Shock is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Shock is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Shock. If not, see <http://www.gnu.org/licenses/>.
+
 package shock
 
 import org.apache.kafka.clients.consumer.{
@@ -15,6 +32,7 @@ class KC(options: Map[String, String]) {
   val _kafkaConsumer: KafkaConsumer[String, String] = new KafkaConsumer[String, String](props)
   val topic = "new_pipeline_instruction"
   val handler: Handler = new InterSCityHandler(options)
+  val recommendedValue: Double = 1000
 
   def createConsumerConfig(options: Map[String, String]): Properties = {
     var brokers: String = "kafka:9092"
@@ -38,7 +56,7 @@ class KC(options: Map[String, String]) {
     opts
   }
 
-  def consume(pollRate: Long = 1000): Unit = {
+  def consume(pollRate: Long = recommendedValue): Unit = {
     this.handler.loadResolvers()
     println("Loading resolvers...")
     _kafkaConsumer.subscribe(Collections.singletonList(this.topic))
@@ -50,7 +68,7 @@ class KC(options: Map[String, String]) {
 
       for (record: ConsumerRecord[String, String] <- records) {
         val msg: String = record.value
-        println("Msg => ", msg)
+        println("Msg => " msg)
         this.handler.handle(msg)
       }
     }
