@@ -27,7 +27,7 @@ import scala.collection.mutable.Queue
 import play.api.libs.json.{JsValue, Json}
 
 class Pipeline() {
-  var state: DataFrame = SparkContext.getOrCreate().emptyRDD().toDF()
+  var state: Option[DataFrame] = None: Option[DataFrame]
   var tasksQueue: Queue[(TaskSignature, JsValue)] = Queue[(TaskSignature, JsValue)]()
   def addTask(task: TaskSignature, args: JsValue): Unit = {
     this.tasksQueue += (task, args).asInstanceOf[Tuple2[TaskSignature, JsValue]]

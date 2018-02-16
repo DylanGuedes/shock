@@ -24,9 +24,18 @@ import com.mongodb.spark.MongoSpark
 
 object MongoIngestion extends IngestionStrategy {
   def ingest(engine: SparkEngine, pipeline: Pipeline, opts: JsValue): Pipeline = {
-    pipeline.state = MongoSpark.load(engine.sc).toDF()
+    pipeline.state = Some(MongoSpark.load(engine.sc).toDF())
 
-    pipeline.state.show()
+    pipeline.state match {
+      case Some(df) => {
+        df.show()
+      }
+
+      case None => {
+        throw new Exception("The data ingestion didn't work.")
+      }
+    }
+
     pipeline
   }
 }

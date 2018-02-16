@@ -32,13 +32,17 @@ object PostRequestIngestion extends IngestionStrategy {
     writer.write(response)
     writer.close()
 
-    val sqlContext = SQLContext.getOrCreate(engine.sc)
-    import sqlContext.implicits._
-    import sqlContext._
+    pipeline.state = Some(engine.spark.read.json("/data/interscity.json"))
 
-    val df = engine.spark.read.json("/data/interscity.json")
-    pipeline.state = df
-    pipeline.state.show()
+    pipeline.state match {
+      case Some(df) => {
+        df.show()
+      }
+
+      case None => {
+        throw new Exception("The data ingestion didn't work.")
+      }
+    }
     pipeline
   }
 }

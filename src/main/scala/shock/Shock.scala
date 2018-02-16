@@ -17,8 +17,6 @@
 
 package shock
 
-import shock.KC
-
 object Shock {
   var options: Map[String, String] = Map[String, String]()
 

@@ -28,8 +28,8 @@ import org.apache.spark.sql.functions.{col, explode, desc}
 object WebsocketPublish extends PublishStrategy {
   def publish(engine: SparkEngine, pipeline: Pipeline, opts: JsValue): Pipeline = {
     // check if the state is empty
-    if (pipeline.state.count != 0) {
-      val df: Dataset[Row] = pipeline.state
+    if (pipeline.state.get.count != 0) {
+      val df: Dataset[Row] = pipeline.state.get
       var ws_server = "ws://172.17.0.1:41234/socket/websocket"
       val opts2: scala.collection.Map[String, JsValue]= opts.as[JsObject].value
       if (opts2.keySet.exists(_ == "ws_server")) {

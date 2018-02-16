@@ -32,7 +32,7 @@ class KC(options: Map[String, String]) {
   val _kafkaConsumer: KafkaConsumer[String, String] = new KafkaConsumer[String, String](props)
   val topic = "new_pipeline_instruction"
   val handler: Handler = new InterSCityHandler(options)
-  val recommendedValue: Double = 1000
+  val recommendedValue: Long = 1000
 
   def createConsumerConfig(options: Map[String, String]): Properties = {
     var brokers: String = "kafka:9092"
@@ -68,7 +68,7 @@ class KC(options: Map[String, String]) {
 
       for (record: ConsumerRecord[String, String] <- records) {
         val msg: String = record.value
-        println("Msg => " msg)
+        println("Msg => " + msg)
         this.handler.handle(msg)
       }
     }
