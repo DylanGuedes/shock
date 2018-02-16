@@ -16,6 +16,7 @@ services:
 before_install:
   - sbt package
   - sbt assembly
+  - docker network create platform
   - docker-compose up -d
   - docker-compose ps
   - sbt scalastyle
