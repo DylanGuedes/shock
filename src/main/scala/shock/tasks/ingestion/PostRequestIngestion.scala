@@ -18,6 +18,7 @@
 package shock.tasks.ingestion
 
 import shock.engines.{SparkEngine}
+import org.apache.spark.sql.functions.{col, explode}
 import shock.{Pipeline}
 import play.api.libs.json.{JsValue}
 import scalaj.http.{HttpResponse, Http}
@@ -33,9 +34,11 @@ object PostRequestIngestion extends IngestionStrategy {
     writer.close()
 
     pipeline.state = Some(engine.spark.read.json("/data/interscity.json"))
+    pipeline.state = Some(pipeline.state.get.select(explode(col("resources").alias("resources")) as "resources"))
 
     pipeline.state match {
       case Some(df) => {
+        df.printSchema()
         df.show()
       }
 

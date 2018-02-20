@@ -21,7 +21,7 @@ import shock.Pipeline
 import shock.engines.{SparkEngine}
 import shock.tasks.ingestion.{MongoIngestion, PostRequestIngestion}
 import shock.tasks.publish.WebsocketPublish
-import shock.tasks.processing.WhereQuery
+import shock.tasks.processing.{WhereQuery, SelectQuery, SciPopulisAnomaly}
 import shock.aliases.{TaskSignature, StringHash}
 
 import play.api.libs.json.{Json, JsValue}
@@ -35,7 +35,11 @@ class InterSCityHandler(options: StringHash) extends Handler {
     this.resolvers += ("mongo_ingestion" -> MongoIngestion.ingest)
     this.resolvers += ("websocket_publish" -> WebsocketPublish.publish)
     this.resolvers += ("post_request_ingestion" -> PostRequestIngestion.ingest)
-    this.resolvers += ("sci_populis_processing" -> WhereQuery.process)
+    this.resolvers += ("sci_populis_processing" -> SciPopulisAnomaly.process)
+    this.resolvers += ("where_query" -> WhereQuery.process)
+    this.resolvers += ("select_query" -> SelectQuery.process)
+
+    this.engine.spark.sparkContext.setLogLevel("ERROR")
   }
 
   /*
