@@ -22,9 +22,23 @@ import shock.{Pipeline}
 import play.api.libs.json.{JsValue}
 
 object WhereQuery extends ProcessingStrategy {
+  /* Process a SparkSQL `where` query in a pipeline state
+   * the `query` argument in the opts will be used
+   */
   def process(engine: SparkEngine, pipeline: Pipeline, opts: JsValue): Pipeline = {
     val query: String = (opts \ "query").get.as[String]
     pipeline.state.get.where(query)
+    pipeline
+  }
+}
+
+object SelectQuery extends ProcessingStrategy {
+  /* Process a SparkSQL `select` query in a pipeline state
+   * the `query` argument in the opts will be used
+   */
+  def process(engine: SparkEngine, pipeline: Pipeline, opts: JsValue): Pipeline = {
+    val query: String = (opts \ "query").get.as[String]
+    pipeline.state = Some(pipeline.state.get.select(query))
     pipeline
   }
 }
