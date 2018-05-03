@@ -18,12 +18,9 @@ import numpy as np
 import pyspark.sql.functions as func
 
 
-def getDistance(x1,y1,x2,y2):
-    return sqrt((x2-x1)**2 + (y2-y1)**2)
-
-
-def velocityFormula(tempo, distance):
-    return float(distance)/float(tempo)
+MAD_CONSTANT = 1.4826
+spark = SparkSession.builder.getOrCreate()
+spark.sparkContext.setLogLevel("ERROR")
 
 
 def takeBy2(points):
@@ -32,7 +29,6 @@ def takeBy2(points):
     >>> takeBy2([1, 2, 3, 4, 5, 6])
     [(1,2),(2,3),(3,4),(4,5),(5,6)] 
     """
-
     if (len(points) == 1):
         return list(zip(points, points))
     if (len(points) < 1):
@@ -57,10 +53,6 @@ def valueMinusMean(values, mean_val):
     for i, u in enumerate(values):
         values[i] = abs(u - mean_val)
     return values
-
-
-def arrayMean(values):
-    return 0 if len(values) == 0 else __builtins__.sum(values)/len(values)
 
 
 def getSchema():
@@ -93,31 +85,37 @@ def loadEdges():
         ])
     return mylist
 
-def loadNodes():
-    dom = minidom.parse("map_reduced.xml")\
-            .getElementsByTagName('node')
-    mylist = []
-    for u in dom:
-        mylist.append([
-            int(u.getAttribute('id')),
-            float(u.getAttribute('x')),
-            float(u.getAttribute('y')),
-        ])
-    return mylist
-
 
 def median(values_list):
     med = np.median(values_list)
     return float(med)
 
-def madConstant(value):
-    return 1.4826*value
 
-def getLowerThreshold(mad, median):
-    return median - 3*mad
+def buildKafkaStream(topics):
+    return spark \
+            .readStream \
+            .format("kafka") \
+            .option("kafka.bootstrap.servers", "kafka:9092") \
+            .option("subscribe", topics) \
+            .option("checkpointLocation", "hdfs://hadoop:9000/")\
+            .load() \
+            .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
 
-def getUpperThreshold(mad, median):
-    return median + 3*mad
+
+def extractJsonFromString(df, attrs):
+    json_objects = []
+    for u in attrs:
+        json_objects.append(get_json_object(df.value, '$.'+u).alias(u))
+    return json_objects
+
+
+def debugStream(stream, outputMode="complete"):
+    return stream\
+            .writeStream.format("console")\
+            .trigger(processingTime='10 seconds')\
+            .outputMode(outputMode)\
+            .option("truncate", False)\
+            .start()\
 
 
 if __name__ == '__main__':
@@ -145,21 +143,13 @@ if __name__ == '__main__':
         return (toTick - fromTick)
 
 
-    spark = SparkSession.builder.getOrCreate()
-    spark.sparkContext.setLogLevel("ERROR")
-
     udfEdgesUnified = udf(takeBy2, ArrayType(ArrayType(ArrayType(StringType()))))
-    udfCalculateVelocity = udf(velocityFormula, DoubleType())
     udfGetEdge = udf(takeEdge, ArrayType(ArrayType(DoubleType())))
     udfValueMinusMean = udf(valueMinusMean, ArrayType(DoubleType()))
-    udfArrayMean = udf(arrayMean, DoubleType())
     udfGetEdgeId = udf(getEdgeId, IntegerType())
     udfGetEdgeLength = udf(getEdgeLength, DoubleType())
     udfGetTickDiff = udf(getTickDiff, IntegerType())
     udfMedian = func.udf(median, FloatType())
-    udfMadConstant = udf(madConstant, FloatType())
-    udfGetLowerThreshold = udf(getLowerThreshold, FloatType())
-    udfGetUpperThreshold = udf(getUpperThreshold, FloatType())
 
     # get data from collector
     collector_url = "http://data-collector:3000"
@@ -193,18 +183,17 @@ if __name__ == '__main__':
     edges_data.show(truncate=False)
 
     grouped_df = edges_data\
-            .withColumn("kmh", udfCalculateVelocity(col("tickDiff"), col("length")))\
+            .withColumn("kmh", col("length") / col("tickDiff"))\
             .groupBy("edgeId")\
 
     velocity_data = grouped_df\
             .agg(udfMedian(func.collect_list(col('kmh'))).alias('median(kmh)'), mean(col("kmh")), collect_list(col("kmh")).alias("array(kmh)"))\
             .withColumn("kmh-median(kmh)", udfValueMinusMean(col("array(kmh)"), col("median(kmh)")))\
             .withColumn("median(kmh-median(kmh))", udfMedian(col("kmh-median(kmh)")))\
-            .withColumn("mad", udfMadConstant(col("median(kmh-median(kmh))")))\
-            .withColumn("upper_threshold", udfGetUpperThreshold(col("mad"), col("median(kmh)")))\
-            .withColumn("lower_threshold", udfGetLowerThreshold(col("mad"), col("median(kmh)")))
+            .withColumn("mad", col("median(kmh-median(kmh))") * MAD_CONSTANT)\
+            .withColumn("upper_threshold", col("median(kmh)") + 3.*col("mad"))\
+            .withColumn("lower_threshold", col("median(kmh)") - 3.*col("mad"))
 
-    print("VELOCITY_DATA => ")
     velocity_data.select("mad", "upper_threshold", "lower_threshold").show(truncate=False)
 
     thresholds = {}
@@ -219,29 +208,12 @@ if __name__ == '__main__':
         return (kmh > upper) or (kmh < lower)
 
 
-    def mountValue(vehicle, tick_array):
-        return json.dumps({"uuid": vehicle, "edges": tick_array})
-
-
     udfIsAnomaly = udf(compareValues, BooleanType())
-    udfMountValue = udf(mountValue, StringType())
 
-    df = spark \
-            .readStream \
-            .format("kafka") \
-            .option("kafka.bootstrap.servers", "kafka:9092") \
-            .option("subscribe", "data_stream") \
-            .option("checkpointLocation", "hdfs://hadoop:9000/")\
-            .load() \
-            .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
-
-    attrs = ["tick", "nodeID", "uuid"]
-    json_objects = []
-    for u in attrs:
-        json_objects.append(get_json_object(df.value, '$.'+u).alias(u))
+    df = buildKafkaStream("data_stream")
 
     stream = df\
-            .select(json_objects)\
+            .select(extractJsonFromString(df, ["tick", "nodeID", "uuid"]))\
             .withColumn("merged", array(col("tick"), col("nodeID")))\
             .groupBy("uuid")\
             .agg(collect_list(col("merged")).alias("tick+nodeID"))\
@@ -252,123 +224,7 @@ if __name__ == '__main__':
             .where(col("edgeId") != -1)\
             .withColumn("length", udfGetEdgeLength(col("edge")))\
             .withColumn("tickDiff", udfGetTickDiff(col("edge")))\
-            .withColumn("kmh", udfCalculateVelocity(col("tickDiff"), col("length")))\
+            .withColumn("kmh", col("length") / col("tickDiff"))\
             .withColumn("is_anomaly", udfIsAnomaly(col("edgeId"), col("kmh")))
-            # .select(udfMountValue(col("uuid"), col("edges")).alias("value"))
 
-    # stream\
-    #         .writeStream.format("kafka")\
-    #         .option("checkpointLocation", "hdfs://hadoop:9000/")\
-    #         .option("kafka.bootstrap.servers", "kafka:9092") \
-    #         .option("topic", "agg_tick_nodeID") \
-    #         .outputMode("complete")\
-    #         .start()
-
-    stream\
-            .writeStream.format("console")\
-            .trigger(processingTime='10 seconds')\
-            .outputMode("complete")\
-            .option("truncate", False)\
-            .start()\
-            .awaitTermination()
-
-    print("Posting in agg_tick_nodeID")
-
-    # df = spark \
-    #         .readStream \
-    #         .format("kafka") \
-    #         .option("kafka.bootstrap.servers", "kafka:9092") \
-    #         .option("subscribe", "agg_tick_nodeID") \
-    #         .option("checkpointLocation", "hdfs://hadoop:9000/")\
-    #         .load() \
-    #         .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
-    #
-    # attrs = ["uuid", "tick+nodeID"]
-    # json_objects = []
-    #
-    # for u in attrs:
-    #     json_objects.append(get_json_object(df.value, '$.'+u).alias(u))
-    #
-    # df.select(json_objects)\
-    #         .writeStream.format("console")\
-    #         .outputMode("append")\
-    #         .option("truncate", False)\
-    #         .start()
-    #
-    # sch = StructType()\
-    #         .add("tick+nodeID", ArrayType(StringType()))\
-    #         .add("uuid", StringType())
-    #
-    #
-    # stream = df\
-    #         .selectExpr("cast (value as string) as json")\
-    #         .select(from_json(col("json"), sch))\
-    #         .writeStream.format("console")\
-    #         .outputMode("append")\
-    #         .option("truncate", False)\
-    #         .start()\
-    #         .awaitTermination()
-
-            # .select("uuid", udfEdgesUnified(col("tick+nodeID")).alias("edges"))\
-
-            # .select(explode(col("edges")).alias("edge"), "uuid")\
-            # .withColumn("edgeId", udfGetEdgeId(col("edge")))\
-            # .withColumn("length", udfGetEdgeLength(col("edge")))\
-            # .withColumn("tickDiff", udfGetTickDiff(col("edge")))\
-            # .withColumn("kmh", udfCalculateVelocity(col("tickDiff"), col("length")))\
-            # .writeStream.format("console")\
-            # .outputMode("append")\
-            # .start()\
-            # .awaitTermination()
-
-            # .select(udfMountValue(col("uuid"), col("tick+nodeID")).alias("value"))\
-            # .writeStream.format("kafka")\
-            # .option("checkpointLocation", "massa_mesmo3")\
-            # .option("kafka.bootstrap.servers", "localhost:9092") \
-            # .option("topic", "agora_vai") \
-            # .outputMode("complete")\
-            # .start()\
-            # .awaitTermination()
-
-    #
-    #
-    #
-    #
-    #         # .writeStream.format("kafka")\
-    #         # .option("checkpointLocation", "checkpoints_massa2")\
-    #         # .option("kafka.bootstrap.servers", "localhost:9092") \
-    #         # .option("topic", "merged_shit")\
-    #         # .outputMode("complete")\
-    #         # .start()
-    #
-    # read_merged = spark \
-    #         .readStream \
-    #         .format("kafka") \
-    #         .option("kafka.bootstrap.servers", "localhost:9092") \
-    #         .option("subscribe", "merged_shit") \
-    #         .load()
-    #
-    # attrs = ["tick+nodeID", "uuid"]
-    # json_objects = []
-    # for u in attrs:
-    #     json_objects.append(get_json_object(df.value, '$.'+u).alias(u))
-    # #
-    # # read_merged\
-    # #         .select("value")\
-    # #         .select(json_objects)\
-    # #         .groupBy("uuid")\
-    # #         .agg(collect_list(col("tick+nodeID")).alias("array(tick+nodeID)"))\
-    # #         .select("uuid", udfEdgesUnified(col("array(tick+nodeID)")).alias("edges"))\
-    # #         .select(explode(col("edges")).alias("edge"), "uuid")\
-    # #         .withColumn("edgeId", udfGetEdgeId(col("edge")))\
-    # #         .withColumn("length", udfGetEdgeLength(col("edge")))\
-    # #         .withColumn("tickDiff", udfGetTickDiff(col("edge")))\
-    # #         .withColumn("kmh", udfCalculateVelocity(col("tickDiff"), col("length")))\
-    # #         .withColumn("isAnomaly", udfDetectAnomaly(col("edgeId"), col("kmh")))
-    #
-    # read_merged\
-    #     .writeStream \
-    #     .format("console") \
-    #     .trigger(processingTime='2 seconds') \
-    #     .start() \
-    #     .awaitTermination()
+    debugStream(stream).awaitTermination()
